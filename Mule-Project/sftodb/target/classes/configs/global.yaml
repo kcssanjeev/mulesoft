@@ -1,0 +1,4 @@
+scheduler:
+  alerts:
+    schedule: "0 6 * * *"
+    timezone: "UTC+00:00"

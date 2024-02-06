@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:email="http://www.mulesoft.org/schema/mule/email"
+	xmlns:slack="http://www.mulesoft.org/schema/mule/slack"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/slack http://www.mulesoft.org/schema/mule/slack/current/mule-slack.xsd
+http://www.mulesoft.org/schema/mule/email http://www.mulesoft.org/schema/mule/email/current/mule-email.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<email:smtp-config name="Email_SMTP" doc:name="Email SMTP" doc:id="ba5b5eb7-26c3-4830-a5e6-971f6af57e7a" >
+		<email:smtp-connection host="smtp.gmail.com" port="587" user="satyaraju.mulesoft@gmail.com" password="Raju@888" />
+	</email:smtp-config>
+	<error-handler name="error-handlingError_Handler" doc:id="5f9ade72-4602-4bfe-94fd-4544f3829840" >
+		<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="31b1ac4e-a51a-49f1-ac5d-d816f4f59c64" type="ANY">
+			<logger level="INFO" doc:name="Logger" doc:id="3ec852f7-6440-4ac3-a157-025171e02b53" />
+			<ee:transform doc:name="Transform Message" doc:id="845a7e3f-a7dc-4b8f-862d-dc8a779e830b">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"processname":"bia-ops-az-failure",
+	"description":error.description,
+	"message":error.errorType.identifier,
+	"statuscode":error.errorMessage
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+			<email:send doc:name="Send" doc:id="aa5d22a8-b7fc-4c09-a40c-d4fee73b889f" config-ref="Email_SMTP" fromAddress="satyaraju.mulesoft@gmail.com" subject="Test">
+			<email:to-addresses>
+				<email:to-address value="rindukuri@salesforce.com" />
+					<email:to-address value="satyaraju.mulesoft@gmail.com" />
+			</email:to-addresses>
+			<email:body contentType="text/plain" />
+		</email:send>
+		</on-error-propagate>
+	</error-handler>
+</mule>

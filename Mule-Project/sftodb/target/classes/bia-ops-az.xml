@@ -1,0 +1,202 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:batch="http://www.mulesoft.org/schema/mule/batch" xmlns:file="http://www.mulesoft.org/schema/mule/file"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/file http://www.mulesoft.org/schema/mule/file/current/mule-file.xsd
+http://www.mulesoft.org/schema/mule/batch http://www.mulesoft.org/schema/mule/batch/current/mule-batch.xsd">
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="e0194dd3-0966-4577-8fe2-6fbfd0aa4188" >
+		<salesforce:config-with-oauth-connection >
+			<salesforce:oauth-callback-config listenerConfig="HTTP_Listener_config" />
+		</salesforce:config-with-oauth-connection>
+	</salesforce:sfdc-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="d161c4fa-13d7-4f4b-b3ec-561c584163ee" >
+		<db:generic-connection url="jdbc:postgresql://prod-or-biops-rds-postgres-db01-biops.co5ddogqlmod.us-west-2.rds.amazonaws.com:5432/sbx_servmgmt" driverClassName="org.postgresql.Driver" user="bia_psql_sa" password="H2vq_B7am_H2vq_B7am" />
+	</db:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="f43c8e80-796f-48fa-9791-903350005df4" >
+		<http:listener-connection host="0.0.0.0" port="8082" />
+	</http:listener-config>
+	<file:config name="File_Config" doc:name="File Config" doc:id="2af18616-846e-420a-bae9-00607f00bb8a" >
+		<file:connection workingDir="C:\\Test\\write" />
+	</file:config>
+	<db:config name="Database_Config1" doc:name="Database Config" doc:id="30f81799-ae3f-4e8a-b770-642b15fc2ac4" >
+		<db:generic-connection driverClassName="org.postgresql.Driver" password="hhhhhhhh"/>
+	</db:config>
+	<configuration doc:name="Configuration" doc:id="783b9546-2584-480f-88af-cbde304adc08" defaultErrorHandler-ref="error-handlingError_Handler" />
+	<flow name="Release-Cases" doc:id="5e1148df-2e9d-49c3-883d-87162923a550" >
+		<http:listener doc:name="Listener" doc:id="4d07f8f8-ea92-4378-95cf-a00f1605db79" config-ref="HTTP_Listener_config" path="/fetchdata" />
+		<logger level="INFO" doc:name="Log Running Release Cases Scheduler" doc:id="2b2663df-9e02-4b67-82c5-1bacc6a7ffdb" message="#[vars.correlationId] | Log Running Release Cases Scheduler"/>
+		<salesforce:query doc:name="Query" doc:id="e963b491-f9db-492f-baa8-7b3bead4f9cc" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[SELECT  CaseNumber ,RequestType__c ,Status ,Was_this_change_successful__c ,Scrum_Team2__r.Vertical__c ,Approved_Release_Date__c ,
+Proposed_Release_Date__c ,Change_Type__c ,OwnerId ,Subject ,CreatedDate ,ClosedDate ,Scrum_Team2__r.Name ,ParentId ,Id ,Number_of_New_Objects__c ,
+Actual_Duration__c ,Case_Sub_Category__c ,Vertical__c ,Manual_Effort_mins__c ,RecordTypeId ,Technology__c ,Scrum_Team2__c   from Case   
+where CreatedDate >= 2018-10-01T00:00:00.000Z and RecordTypeId = '01270000000EA3XAAW' limit 1]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="3092f804-d1fa-4c9c-9dd9-c0f5d9a71cd1" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="releasecases" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="e9fe1994-1b10-45b4-b5bb-7414335af324" message='#["Total Records Retrieved":sizeOf(payload)]'/>
+		<db:select doc:name="Select" doc:id="d5de005a-303e-4715-8b67-e9d551eca6e3" config-ref="Database_Config1" transactionalAction="NOT_SUPPORTED">
+				<db:sql><![CDATA[select count(1) as recordcount from release_cases where id=:Id]]></db:sql>
+				<db:input-parameters><![CDATA[#[{Id:payload.Id}]]]></db:input-parameters>
+			</db:select>
+		<logger level="INFO" doc:name="Logger" doc:id="7d1179d1-fb6b-403c-bb1a-402135dd5c40" />
+		<batch:job jobName="bia-ops-azBatch_Job" doc:id="02b46467-b0f1-455c-961e-1981dc237e85" >
+			<batch:process-records >
+				<batch:step name="Batch_Step" doc:id="a82065b6-01f6-4679-8018-2dad3c2b4387" >
+					<choice doc:name="Choice" doc:id="8387febe-ee27-483c-aa6d-57efd6d3c23d">
+			<when expression="#[vars.recordcount.RECORDCOUNT[0]==1]">
+					<ee:transform doc:name="Transform Message" doc:id="d9290961-121b-418b-893f-72f04955d292">
+								<ee:message>
+									<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+vars.releasecases map ({
+case_number : $.CaseNumber,
+request_type : $.RequestType__c,
+status : $.Status,
+change_successful : $.Was_this_change_successful__c,
+scrum_team_vertical : $.Scrum_Team2__r.Vertical__c,
+approved_release_date : $.Approved_Release_Date__c,
+proposed_release_date : $.Proposed_Release_Date__c,
+change_type : $.Change_Type__c,
+owner_id : $.OwnerId,
+subject : $.Subject,
+created_date : $.CreatedDate,
+closed_date : $.ClosedDate,
+scrum_team_name : $.Scrum_Team2__r.Name,
+parent_case_id : $.ParentId,
+number_of_objects : $.Number_of_New_Objects__c,
+actual_completion_date : $.Actual_Duration__c,
+case_sub_category : $.Case_Sub_Category__c,
+function_service_group : $.Vertical__c,
+manual_effort : $.Manual_Effort_mins__c,
+record_type_id : $.RecordTypeId,
+technology : $.Technology__c,
+scrum_team_id : $.Scrum_Team2__c
+})
+]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+							<foreach doc:name="For Each" doc:id="7a4d3872-9076-4d7d-8528-c096cf1b6885" >
+								<logger level="INFO" doc:name="Logger" doc:id="fd6c21f2-1d38-4009-8e6a-2d6dd46fa013" message='#["started insert operation"]'/>
+								<db:insert doc:name="Insert" doc:id="4923fb7c-f329-4d79-a537-e23486d17fec" config-ref="Database_Config1">
+			<db:sql><![CDATA[insert into release_cases(case_number,request_type,status,change_successful,scrum_team_vertical,scrum_team_name,approved_release_date,proposed_release_date,change_type,owner_id,subject,created_date,closed_date,parent_case_id,id,number_of_objects,actual_completion_date,case_sub_category,function_service_group,manual_effort,record_type_id,technology,scrum_team_id) values 
+(:case_number,:request_type,:status,:change_successful,:scrum_team_vertical,:scrum_team_name,:approved_release_date,:proposed_release_date,:change_type,:owner_id,:subject,:created_date,:closed_date,:parent_case_id,:id,:number_of_objects,:actual_completion_date,:case_sub_category,:function_service_group,:manual_effort,:record_type_id,:technology,:scrum_team_id)
+]]></db:sql>
+									<db:input-parameters><![CDATA[#[{
+case_number : payload.CaseNumber,
+request_type : payload.RequestType__c,
+status : payload.Status,
+change_successful : payload.Was_this_change_successful__c,
+scrum_team_vertical : payload.Scrum_Team2__r.Vertical__c,
+approved_release_date : payload.Approved_Release_Date__c,
+proposed_release_date : payload.Proposed_Release_Date__c,
+change_type : payload.Change_Type__c,
+owner_id : payload.OwnerId,
+subject : payload.Subject,
+created_date : payload.CreatedDate,
+closed_date : payload.ClosedDate,
+scrum_team_name : payload.Scrum_Team2__r.Name,
+parent_case_id : payload.ParentId,
+id : payload.Id,
+number_of_objects : payload.Number_of_New_Objects__c,
+actual_completion_date : payload.Actual_Duration__c,
+case_sub_category : payload.Case_Sub_Category__c,
+function_service_group : payload.Vertical__c,
+manual_effort : payload.Manual_Effort_mins__c,
+record_type_id : payload.RecordTypeId,
+technology : payload.Technology__c,
+scrum_team_id : payload.Scrum_Team2__c
+}]]]></db:input-parameters>
+		</db:insert>
+								<logger level="INFO" doc:name="Logger" doc:id="fc8ea6e9-6570-44bd-b523-3865ce79603b" />
+							</foreach>
+				</when>
+						<otherwise>
+					<ee:transform doc:name="Transform Message" doc:id="104098f4-9f74-430c-a457-a99c2ebe8029">
+								<ee:message>
+									<ee:set-payload><![CDATA[%dw 2.0
+output application/json skipNullOn="everywhere"
+---
+vars.releasecases map ({
+case_number : $.CaseNumber,
+request_type : $.RequestType__c,
+status : $.Status,
+change_successful : $.Was_this_change_successful__c,
+scrum_team_vertical : $.Scrum_Team2__r.Vertical__c,
+approved_release_date : $.Approved_Release_Date__c,
+proposed_release_date : $.Proposed_Release_Date__c,
+change_type : $.Change_Type__c,
+owner_id : $.OwnerId,
+subject : $.Subject,
+created_date : $.CreatedDate,
+closed_date : $.ClosedDate,
+scrum_team_name : $.Scrum_Team2__r.Name,
+parent_case_id : $.ParentId,
+id : $.Id,
+number_of_objects : $.Number_of_New_Objects__c,
+actual_completion_date : $.Actual_Duration__c,
+case_sub_category : $.Case_Sub_Category__c,
+function_service_group : $.Vertical__c,
+manual_effort : $.Manual_Effort_mins__c,
+record_type_id : $.RecordTypeId,
+technology : $.Technology__c,
+scrum_team_id : $.Scrum_Team2__c
+})]]></ee:set-payload>
+								</ee:message>
+							</ee:transform>
+							<foreach doc:name="For Each" doc:id="3eeb2b5f-e8cb-4d38-b4f1-5e7c7229e74f" >
+								<logger level="INFO" doc:name="Logger" doc:id="27553481-0a4b-4297-aadc-dca7a5ed7501" message='#["started update operation"]'/>
+								<until-successful maxRetries="2" doc:name="Until Successful" doc:id="d14fc944-a6b3-4ccc-9113-2876af3771a4" millisBetweenRetries="6000">
+									<db:update doc:name="Update" doc:id="7dbd809a-6612-4e5a-b068-e007327bb13a" config-ref="Database_Config1">
+						<db:sql><![CDATA[UPDATE release_cases SET case_number=:case_number,request_type=:request_type,status=:status,change_successful=:change_successful,scrum_team_vertical=:scrum_team_vertical,scrum_team_name=:scrum_team_name,approved_release_date=:approved_release_date,proposed_release_date=:proposed_release_date,change_type=:change_type,owner_id=:owner_id,subject=:subject,created_date=:created_date,closed_date=:closed_date,parent_case_id=:parent_case_id,number_of_objects=:number_of_objects,actual_completion_date=:actual_completion_date,case_sub_category=:case_sub_category,function_service_group=:function_service_group,manual_effort=:manual_effort,record_type_id=:record_type_id,technology=:technology,scrum_team_id=:scrum_team_id WHERE 
+id=:id]]></db:sql>
+									<db:input-parameters><![CDATA[#[{
+case_number : payload.CaseNumber,
+request_type : payload.RequestType__c,
+status : payload.Status,
+change_successful : payload.Was_this_change_successful__c,
+scrum_team_vertical : payload.Scrum_Team2__r.Vertical__c,
+approved_release_date : payload.Approved_Release_Date__c,
+proposed_release_date : payload.Proposed_Release_Date__c,
+change_type : payload.Change_Type__c,
+owner_id : payload.OwnerId,
+subject : payload.Subject,
+created_date : payload.CreatedDate,
+closed_date : payload.ClosedDate,
+scrum_team_name : payload.Scrum_Team2__r.Name,
+parent_case_id : payload.ParentId,
+id : payload.Id,
+number_of_objects : payload.Number_of_New_Objects__c,
+actual_completion_date : payload.Actual_Duration__c,
+case_sub_category : payload.Case_Sub_Category__c,
+function_service_group : payload.Vertical__c,
+manual_effort : payload.Manual_Effort_mins__c,
+record_type_id : payload.RecordTypeId,
+technology : payload.Technology__c,
+scrum_team_id : payload.Scrum_Team2__c
+}]]]></db:input-parameters>
+					</db:update>
+								</until-successful>
+								<logger level="INFO" doc:name="Logger" doc:id="900cf698-9eb0-4be3-9746-7cf1fedc9388" message='#["completed successful"]'/>
+							</foreach>
+				</otherwise>
+		</choice>
+				</batch:step>
+			</batch:process-records>
+		</batch:job>
+		<error-handler ref="error-handlingError_Handler" />
+	</flow>
+</mule>
